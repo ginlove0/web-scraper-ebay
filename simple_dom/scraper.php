@@ -1,9 +1,8 @@
 <?php
 require 'simple_html_dom.php';
 
-$id = 1;
 
-$url = 'https://www.ebay.com/sch/i.html?_fsrp=1&_nkw=cisco&_sacat=0&_from=R40&Brand=Cisco&LH_ItemCondition=1000%7C1500%7C3000%7C2000%7C2500&_pgn='.$id.'&rt=nc';
+$url = 'https://www.it-market.com/en/cisco-systems';
 
 $html = file_get_html($url);
 
@@ -12,77 +11,105 @@ $sellerData= [];
 $itemData = [];
 
 
-
 if(!empty($html))
 {
-    $divClass = $title = ''; $i = 0;
+    $i = 0;
 
-    foreach ($html->find('#mainContent') as $divClass)
+    foreach ($html->find('#site-wrap') as $divClass)
     {
-        if($id > 2)
+
+        foreach ($divClass -> find('#content') as $content)
         {
-            break;
-        }
 
-        foreach ($divClass -> find('#srp-river-results') as $items)
-        {
-            foreach ($items -> find('.s-item') as $item){
+            foreach ($content -> find('#more-categories') as $categoryLinkList){
+
+                foreach($categoryLinkList -> find('a') as $categoryLink) {
+                    $link = $categoryLink -> href;
+
+                    $html1 = file_get_html($link);
+
+                    foreach($html1 -> find('#more-categories') as $layer2Category) {
+
+                        foreach ($layer2Category -> find('a') as $layer2CategoryLink) {
+
+//                            $layer2Link =  $layer2CategoryLink -> href;
+                            $layer2Link = 'https://www.it-market.com/en/cisco-systems/cisco-router-series/cisco-series-3800';
+                            $page = 2;
+                            $html2 = file_get_html($layer2Link . '?cat=200&next_page=' . $page);
 
 
-                $itemImg = $item -> find('img.s-item__image-img', 0);
-                $imgSrc = $itemImg -> src;
-                $itemTitle = $itemImg -> alt;
+                            foreach ($html2->find('#site-wrap') as $itemPage) {
+                                foreach ($itemPage->find('#content') as $contentItemPage) {
+                                    foreach ($contentItemPage->find('.panel-default') as $panelItemPage) {
+                                        foreach ($panelItemPage->find('.vertical-helper') as $itemDetailUrl) {
+                                            $itemLink = $itemDetailUrl->href;
+                                            $html3 = file_get_html($itemLink);
 
-                $itemLink = $item -> find('a.s-item__link', 0);
+                                            if (!empty($html3)) {
+                                                foreach ($html3->find('#container') as $itemDetailPage) {
+                                                    foreach ($itemDetailPage->find('#breadcrumb-main') as $breadCrumb) {
+                                                        $detailBreadCrumb = $breadCrumb->find('span[itemprop=title]');
+                                                        $text1 = html_entity_decode($detailBreadCrumb[0]->plaintext);
+                                                        $text2 = html_entity_decode($detailBreadCrumb[1]->plaintext);
+                                                        $text3 = html_entity_decode($detailBreadCrumb[2]->plaintext);
 
-                $itemUrl = $itemLink -> href;
-//                $itemPrice = $item -> find('span.s-item__price', 0)->plaintext;
 
-                $html2 = file_get_html($itemUrl);
+                                                        $category = $text1 . '>' . $text2 . '>' . $text3;
+                                                    }
+//
 
-                foreach ($html2->find('#RightSummaryPanel') as $sellerDetail)
-                {
-                    $sellerName = $sellerDetail -> find('.mbg-nw',0)->plaintext;
-                    $score = $sellerDetail -> find('.vi-mbgds3-bkImg', 0);
-                    $sellerScore = $score -> title;
-                    $positiveRate = $sellerDetail -> find('#si-fb',0)->plaintext;
+                                                    foreach ($itemDetailPage->find('#content') as $itemContent) {
+                                                        //title
+                                                        $itemTitle = $itemContent->find('h1[class=h3 top-heading]');
+                                                        $textItemTitle = html_entity_decode($itemTitle[0]->plaintext);
 
-                    $sellerData[$i] = [
-                        'name' => $sellerName,
-                        'score' => $sellerScore,
-                        'rate' => $positiveRate
-                    ];
-                }
+                                                            //SKU
+                                                        $sku = str_replace("Cisco Systems ","",$textItemTitle);
 
-                foreach ($html2 -> find('#LeftSummaryPanel') as $itemInfo)
-                {
-                    $itemCondition = $itemInfo -> find('#vi-itm-cond', 0)-> plaintext;
-                    $itemPrice = $itemInfo -> find('.notranslate', 0)-> plaintext;
 
-                    $itemShipping = $itemInfo -> find('#fshippingCost', 0) -> plaintext;
-                    if(!$itemShipping){
-                        $itemShipping = 'FREE';
+                                                        //short description
+                                                        $itemShortDescription = $itemContent->find('h2[class=short-description textstyles text-word-wrap]');
+                                                        $textShortDescription = html_entity_decode($itemShortDescription[0]->plaintext);
+
+                                                        //img
+
+
+                                                        foreach ($itemContent -> find('#product-images') as $productImage) {
+
+                                                            foreach ($productImage -> find('div[class="image product-image img-thumbnail center"]') as $imgDiv) {
+
+                                                                foreach ($imgDiv -> find('img') as $imgLink) {
+                                                                    $itemImg = 'https://www.it-market.com' . $imgLink->src;
+                                                                }
+
+                                                            }
+                                                        }
+
+
+                                                        //description
+                                                        $itemDes = $itemContent->find('#description');
+                                                        $description = preg_replace( '<br />', '', rtrim(html_entity_decode(strip_tags($itemDes[0]))) );
+
+                                                        $data = '"'.trim($sku).'"' .','. '"'.trim($category).'"'.','.'"'.trim($sku).'"'.','.'"'.trim($textShortDescription) .'"'.','.'"'.trim($itemImg).'"'.','.'"'.trim($description).'"'."\n";
+                                                        file_put_contents("test.csv",$data,FILE_APPEND);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            $page++;
+                        }
                     }
-                    $itemData[$i] = [
-                        'condition' => $itemCondition,
-                        'price' => $itemPrice,
-                        'shippingFee' => trim($itemShipping)
-                    ];
+
+
+
                 }
-
-
-                $data[$i] = [
-                    'title' => $itemTitle,
-                    'url' => $itemUrl,
-                    'img' => $imgSrc,
-                    'seller' => $sellerData[$i],
-                    'itemData' => $itemData[$i]
-                ];
 
                 $i++;
             }
         }
-        $id++;
     }
 }
 else{
@@ -110,7 +137,7 @@ $xml_user_info = new SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><ro
 $xmlContent = array_to_xml($data,$xml_user_info);
 
 // Create a xml file
-$my_file = "Ebay.xml";
+$my_file = "it-market.xml";
 $handle = fopen($my_file, 'w') or die('Cannot open file: '.$my_file);
 //success and error message based on xml creation
 if(fwrite($handle, $xmlContent)) {
